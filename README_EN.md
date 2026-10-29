@@ -30,7 +30,12 @@ Three ways to pick: **Fixed** (reproduce an exact pose), **Random (whole library
 
 ## Installation
 
-Drop the whole `ComfyUI-GuliPoses` folder into `ComfyUI/custom_nodes/` and restart ComfyUI.
+```bash
+cd ComfyUI/custom_nodes
+git clone https://github.com/guliacer/ComfyUI-GuliPoses.git
+```
+
+No git? Download the repository and drop the `ComfyUI-GuliPoses` folder into `ComfyUI/custom_nodes/`, then restart ComfyUI.
 
 ```
 ComfyUI/
@@ -47,6 +52,7 @@ ComfyUI/
 Then right-click the canvas → **Add Node** → **GuliPoses** → **GG 姿态库**.
 
 > A fresh install needs the image library in `poses/` (~368 MB). See [Data](#data).
+> The repository holds code only — images are not versioned, so this step is required or the gallery stays empty.
 
 ---
 

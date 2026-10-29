@@ -30,7 +30,12 @@
 
 ## 安装
 
-把整个 `ComfyUI-GuliPoses` 目录放进 `ComfyUI/custom_nodes/`，重启 ComfyUI。
+```bash
+cd ComfyUI/custom_nodes
+git clone https://github.com/guliacer/ComfyUI-GuliPoses.git
+```
+
+没有 git 就把仓库整个下载下来，把 `ComfyUI-GuliPoses` 目录放进 `ComfyUI/custom_nodes/`，重启 ComfyUI。
 
 ```
 ComfyUI/
@@ -47,6 +52,7 @@ ComfyUI/
 装完在画布空白处右键 → 新建节点 → **GuliPoses** → **GG 姿态库**。
 
 > 首次安装需要准备图库资源（`poses/` 目录，约 368 MB），见 [数据](#数据) 一节。
+> 仓库里只有代码（图片不入版本库），这一步不能跳过，否则画廊是空的。
 
 ---
 
