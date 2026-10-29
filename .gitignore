@@ -1,0 +1,12 @@
+# 图库资源体积大，不入版本库；换机器时重新复制 + 跑 tools/build_pose_db.py
+poses/img/
+poses/thumbs/
+poses/index.json
+# 用户在节点里导入的姿态图，属于本地数据
+poses/custom/
+
+__pycache__/
+*.pyc
+
+# 本地工作记录，不入公开仓库
+.workbuddy-ai/
