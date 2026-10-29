@@ -5,6 +5,10 @@ poses/thumbs/
 # 用户在节点里导入的姿态图，属于本地数据，永远不入版本库
 poses/custom/
 
+# 离线安装包走 GitHub Release 附件，不进版本库
+*.7z
+*.zip
+
 __pycache__/
 *.pyc
 
