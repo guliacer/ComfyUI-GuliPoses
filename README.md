@@ -247,12 +247,24 @@ git clone https://github.com/guliacer/ComfyUI-GuliNodes.git
 | --- | --- |
 | `nodes.py` | 节点定义、三种模式分支、`IS_CHANGED` 缓存策略、`ui.picked` 回传 |
 | `pose_db.py` | 索引缓存、`pool()` 候选集与回退链、`pick_angle()`、缺图回退、按需生成缩略图；扫描 `poses/custom/` 并与内置索引合并 |
-| `api_routes.py` | `/guliposes/index.json`、`/guliposes/thumb/{name}`、`/guliposes/img/{name}`、`/guliposes/custom/thumb/{name}`、`/guliposes/custom/img/{name}`、`/guliposes/custom/upload`、`/guliposes/custom/delete`（只按文件名取，禁止目录穿越；内置图带 7 天缓存，自定义图走协商缓存） |
+| `api_routes.py` | 静态路由，导入即自注册。只按文件名取、禁止目录穿越；内置图 7 天缓存，自定义图走协商缓存 |
 | `web/gg-pose-gallery.js` | DOM 画廊控件（无构建步骤，直接 ES module），随机模式的候选池与后端同口径 |
 | `tools/build_pose_db.py` | 生成索引 |
 | `tools/optimize_library.py` | PNG → WebP 转换 |
 | `tools/release_upload.py` | 建 Release 并上传离线包 |
 | `AGENTS.md` | 开发规范（与 ComfyUI-GuliNodes 同源）：设计自检、命名、显示规则、前端红线、验证流程 |
+
+对外路由（ComfyUI 会同时挂在根路径和 `/api` 下，两条都通）：
+
+```
+GET  /guliposes/index.json            索引
+GET  /guliposes/img/{name}            内置原图
+GET  /guliposes/thumb/{name}          内置缩略图（缺失时用原图现生成）
+GET  /guliposes/custom/img/{name}     自定义原图
+GET  /guliposes/custom/thumb/{name}   自定义缩略图
+POST /guliposes/custom/upload         导入
+POST /guliposes/custom/delete         删除
+```
 
 ### 验证脚本
 
@@ -321,7 +333,7 @@ COMFY_PORT=8189 node tools/verify/custom-import.mjs     # 导入闭环：点导�
 
 > **本项目从想法到素材，都来自下面这个仓库。**
 >
-> ### [anhao/ai-pose-gallery-zh](https://github.com/anhao/ai-pose-gallery-zh)
+> **[anhao/ai-pose-gallery-zh](https://github.com/anhao/ai-pose-gallery-zh)**
 > 中文版 AI 姿势参考图库 · 288 组 / 1439 张原图 · 完整汉化 · 零依赖静态画廊
 
 - **灵感**：先有了它那个能按体系 / 分类 / 视角筛选、带灯箱和键盘导航的网页画廊，才有「把这套浏览体验搬进 ComfyUI 节点里」这个想法。三种取图模式里的「范围内随机」，本质上也是把它网页上的筛选逻辑换成了随机抽样。

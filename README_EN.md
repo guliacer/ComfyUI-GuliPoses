@@ -247,12 +247,24 @@ Or install `ComfyUI-GuliNodes` from ComfyUI Manager, then hard-refresh the brows
 | --- | --- |
 | `nodes.py` | Node definition, the three mode branches, `IS_CHANGED` cache strategy, `ui.picked` round-trip |
 | `pose_db.py` | Index caching, `pool()` candidate sets and fallback chain, `pick_angle()`, missing-image fallback, on-demand thumbnails; scans `poses/custom/` and merges it into the built-in index |
-| `api_routes.py` | `/guliposes/index.json`, `/guliposes/thumb/{name}`, `/guliposes/img/{name}`, `/guliposes/custom/thumb/{name}`, `/guliposes/custom/img/{name}`, `/guliposes/custom/upload`, `/guliposes/custom/delete` (filename-only, no directory traversal; 7-day cache for built-in images, negotiated caching for custom ones) |
+| `api_routes.py` | Static routes, self-registered on import. Filename-only, no directory traversal; 7-day cache for built-in images, negotiated caching for custom ones |
 | `web/gg-pose-gallery.js` | The DOM gallery widget (no build step, plain ES module); its random-mode candidate pool matches the backend |
 | `tools/build_pose_db.py` | Generates the index |
 | `tools/optimize_library.py` | PNG → WebP conversion |
 | `tools/release_upload.py` | Creates the Release and uploads the offline archive |
 | `AGENTS.md` | Development rules (shared with ComfyUI-GuliNodes): design checklist, naming, display rules, frontend red lines, verification flow |
+
+Public routes (ComfyUI mounts them both at the root and under `/api`, so either works):
+
+```
+GET  /guliposes/index.json            index
+GET  /guliposes/img/{name}            built-in full-size image
+GET  /guliposes/thumb/{name}          built-in thumbnail (rendered on demand if missing)
+GET  /guliposes/custom/img/{name}     custom full-size image
+GET  /guliposes/custom/thumb/{name}   custom thumbnail
+POST /guliposes/custom/upload         import
+POST /guliposes/custom/delete         delete
+```
 
 ### Verification scripts
 
@@ -321,7 +333,7 @@ This plugin only exists because someone else organised the library first.
 
 > **Both the idea and the assets behind this project come from the repository below.**
 >
-> ### [anhao/ai-pose-gallery-zh](https://github.com/anhao/ai-pose-gallery-zh)
+> **[anhao/ai-pose-gallery-zh](https://github.com/anhao/ai-pose-gallery-zh)**
 > Chinese edition of an AI pose reference gallery · 288 sets / 1439 source images · fully localised · zero-dependency static gallery
 
 - **Idea**: its web gallery — filterable by series / category / angle, with a lightbox and keyboard navigation — came first; "bring that browsing experience into a ComfyUI node" followed. The scoped random mode is essentially its filter logic turned into sampling.
