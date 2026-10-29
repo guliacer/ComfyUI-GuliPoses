@@ -8,7 +8,9 @@
 import json
 import os
 import threading
+import uuid
 from pathlib import Path
+from typing import Optional
 
 from PIL import Image, ImageOps
 
@@ -128,6 +130,37 @@ def _make_thumb(src: Path, dst: Path) -> None:
         im.thumbnail((THUMB_SIDE, THUMB_SIDE), Image.LANCZOS)
         dst.parent.mkdir(parents=True, exist_ok=True)
         im.save(dst, "JPEG", quality=86, optimize=True)
+
+
+def ensure_thumb(thumb_name: str) -> Optional[Path]:
+    """拿到缩略图路径；没有就用原图现生成一张。
+
+    内置库只分发原图：1439 张缩略图会多出 26 MB 和 1439 个文件，而它们完全可以从原图算出来。
+    所以首次请求某张缩略图时现场生成并落盘，之后跟以前一样走浏览器缓存。
+    原图和缩略图同 stem 不同后缀（`xxx_front.webp` → `xxx_front.jpg`），按 stem 反查即可。
+    """
+    name = Path(str(thumb_name or "")).name
+    if not name:
+        return None
+    target = THUMB_DIR / name
+    if target.is_file():
+        return target
+
+    stem = Path(name).stem
+    source = next((p for ext in IMAGE_EXTS if (p := IMG_DIR / f"{stem}{ext}").is_file()), None)
+    if source is None:
+        return None
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    # 同一张图被并发请求时各写各的临时文件，最后一次 replace 胜出，不会有人读到半个 JPEG
+    tmp = target.with_name(f"{target.name}.{uuid.uuid4().hex[:8]}.tmp")
+    try:
+        _make_thumb(source, tmp)
+        tmp.replace(target)
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        return None
+    return target
 
 
 def clean_label(raw: str, fallback: str = CUSTOM_CAT) -> str:

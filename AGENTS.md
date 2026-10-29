@@ -15,15 +15,24 @@
 | `pose_db.py` | 索引缓存、候选池与回退链、视角解析、缺图回退 |
 | `api_routes.py` | 索引 / 缩略图 / 原图的只读路由，加自定义姿态的上传与删除，全部带路径穿越防护 |
 | `web/` | 前端扩展，文件名一律 `gg-<功能>.js` |
-| `poses/` | 图库资源（`img/`、`thumbs/`、`index.json`），**不入版本库** |
-| `poses/custom/` | 用户自己导入的姿态图，同样**不入版本库**；缩略图由插件生成在 `custom/thumbs/`，名称 / 分类 / 视角记在 `custom/meta.json` |
+| `poses/img/` | 内置原图，1439 张 900×1200 **WebP**（约 104 MB），**随仓库分发** |
+| `poses/thumbs/` | 画廊缩略图，**不入库**——缺失时由 `pose_db.ensure_thumb()` 用原图现生成 |
+| `poses/index.json` | 索引，**随仓库分发**；`img` 字段记实际落盘的扩展名 |
+| `poses/custom/` | 用户自己导入的姿态图，**不入版本库**；缩略图由插件生成在 `custom/thumbs/`，名称 / 分类 / 视角记在 `custom/meta.json` |
 | `data/zh-dict.csv` | 日→中对照表，重建索引时需要 |
-| `tools/` | `build_pose_db.py` 建索引；`tools/verify/*.mjs` 无头验证 |
+| `tools/` | `build_pose_db.py` 建索引、`optimize_library.py` 转 WebP；`tools/verify/*.mjs` 无头验证 |
 
 - 节点 ID `GuliPosePicker` 稳定且唯一，改动会断旧工作流。
 - 显示名用**中文**，统一 `GG ` 前缀（与 GuliNodes 的 `GG 图像宽高` 等一致）。
 - 分类统一 `GuliPoses`。
 - 新增前端扩展放 `web/`，`app.registerExtension({ name: "ComfyUI.GGPoses.<功能>" })`。
+
+### 图库资源（`poses/`）
+
+- **原图用 WebP，不用 PNG**。同一批白模线稿，PNG 要 343 MB，WebP q95 只要 104 MB（实测 PSNR 50.9 dB、最大像素差 8/255、放大 2.3 倍看不出差别）。仓库体积直接决定 clone 体验，这条不要退回 PNG。转换用 `tools/optimize_library.py`，`--dry-run` 可先估算。
+- **缩略图不入库**。1439 张缩略图能从原图算出来，没必要让每个人下载。`pose_db.ensure_thumb(thumb_name)` 在文件缺失时用原图现生成（同 stem 不同后缀，`xxx.webp` → `xxx.jpg`），走临时文件 + `uuid` 后缀 + 原子 `replace`，并发请求同一张不会读到半个 JPEG。实测 288 张全部现场生成 2.8 s / 单张 57 ms，浏览器懒加载只取可视区。
+- **索引的 `img` 字段必须写实际存在的文件名**。`build_pose_db.py` 的 `resolve_img()` 按 `.webp` → `.png` → `.jpg` 顺序找，找到哪个写哪个；`nodes.py` 用 `Image.open()` 读，WebP 与 PNG 走同一条路径，不需要分支。
+- 改图库格式后要重跑 `build_pose_db.py`，否则索引还指着旧扩展名，画廊与节点都会 404。
 
 ### 自定义姿态库（`poses/custom/`）
 

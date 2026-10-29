@@ -7,7 +7,9 @@
 分类与姿势名会按 data/zh-dict.csv 译成中文（该表来自 anhao/ai-pose-gallery-zh）。
 对照表缺失时自动退回日文原文，并在结尾报告未命中的条目数。
 
-图片资源需自行放到 poses/img 与 poses/thumbs（本脚本只生成索引，不动图片）。
+原图需放在 poses/img（本脚本只生成索引，不动图片）。缩略图不用准备：
+poses/thumbs 缺失时节点会在首次请求时用原图现生成。原图推荐先用
+tools/optimize_library.py 转成 WebP，体积能降到 1/3.4。
 """
 
 import csv
@@ -19,8 +21,27 @@ from pathlib import Path
 
 NODE_DIR = Path(__file__).resolve().parents[1]
 DB_DIR = NODE_DIR / "poses"
+IMG_DIR = DB_DIR / "img"
 INDEX_FILE = DB_DIR / "index.json"
 ZH_DICT = NODE_DIR / "data" / "zh-dict.csv"
+
+# 原图可能是 PNG，也可能已经被 tools/optimize_library.py 转成 WebP。
+# 索引里要写实际存在的那个名字，否则前端拿到 404。
+IMG_EXTS = (".webp", ".png", ".jpg", ".jpeg")
+
+
+def resolve_img(name: str) -> str:
+    """按实际落盘的文件名返回（优先 WebP）。找不到就原样返回，让缺图由 resolve() 去兜。"""
+    path = Path(str(name or "")).name
+    if not path:
+        return path
+    if (IMG_DIR / path).is_file():
+        return path
+    stem = Path(path).stem
+    for ext in IMG_EXTS:
+        if (IMG_DIR / f"{stem}{ext}").is_file():
+            return f"{stem}{ext}"
+    return path
 
 DEFAULT_SRC = Path(
     r"C:\Users\Admin\Desktop\PS高速缓存\1439个白模姿态参考图📢\1400个白模姿态图\pose-db-01"
@@ -119,7 +140,7 @@ def build(src: Path) -> dict:
             )
             meta["count"] += 1
 
-        img = Path(row["原图"]).name
+        img = resolve_img(row["原图"])
         thumb = Path(row["缩略图"]).name
         rec["angles"][angle] = {"img": img, "thumb": thumb}
 

@@ -1,8 +1,8 @@
-# 图库资源体积大，不入版本库；换机器时重新复制 + 跑 tools/build_pose_db.py
-poses/img/
+# 内置图库：原图随仓库分发（1439 张 WebP，约 104 MB），clone 完就能用。
+# 缩略图不进仓库——它们能从原图算出来，节点在首次请求时现生成到 poses/thumbs/。
 poses/thumbs/
-poses/index.json
-# 用户在节点里导入的姿态图，属于本地数据
+
+# 用户在节点里导入的姿态图，属于本地数据，永远不入版本库
 poses/custom/
 
 __pycache__/

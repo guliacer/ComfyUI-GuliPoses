@@ -37,7 +37,11 @@ def register() -> None:
 
     @routes.get("/guliposes/thumb/{name}")
     async def pose_thumb(request):
-        return _serve(pose_db.THUMB_DIR, request.match_info["name"], "public, max-age=604800")
+        # 缩略图不随仓库分发（能省 26 MB / 1439 个文件），首次请求时用原图现生成
+        path = await asyncio.to_thread(pose_db.ensure_thumb, request.match_info["name"])
+        if path is None:
+            raise web.HTTPNotFound()
+        return web.FileResponse(path, headers={"Cache-Control": "public, max-age=604800"})
 
     @routes.get("/guliposes/img/{name}")
     async def pose_img(request):
