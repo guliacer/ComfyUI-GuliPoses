@@ -5,22 +5,31 @@
 
 ## 一、项目与落位
 
-把白模（3D mannequin 线稿）姿态图库搬进画布：一个节点 **GG 姿态库**（`GuliPosePicker`，分类 `GuliPoses`），
-节点内画廊选姿态与视角，只输出一张图。定位是**轻量、中文友好、零额外 Python 依赖**。
+把白模（3D mannequin 线稿）姿态图库搬进画布，并扩展出平行图库：主节点 **GG 姿态库**（`GuliPosePicker`）、
+服装穿搭图库 **GG 服装库**（`GuliGarmentPicker`），两者同属分类 `GuliPoses`，节点内画廊选图、只输出一张图。
+后端以「库（lib）」抽象：`pose`=姿态库、`garment`=服装库；加库只需在 `pose_db.LIB_DIRS` 加一项 + 写一个 `GuliXxxPicker` 节点 + 对应的 `build_*_db.py`。
+定位是**轻量、中文友好、零额外 Python 依赖**。
 
 | 位置 | 职责 |
 | --- | --- |
 | `__init__.py` | 插件入口，只导入映射并声明 `WEB_DIRECTORY`，**不写逻辑**（路由在 `api_routes` 导入时自注册） |
-| `nodes.py` | 节点定义、三种取图模式、`IS_CHANGED` 缓存策略、`ui.picked` 回传 |
-| `pose_db.py` | 索引缓存、候选池与回退链、视角解析、缺图回退 |
-| `api_routes.py` | 索引 / 缩略图 / 原图的只读路由，加自定义姿态的上传与删除，全部带路径穿越防护 |
-| `web/` | 前端扩展，文件名一律 `gg-<功能>.js` |
-| `poses/img/` | 内置原图，1439 张 900×1200 **WebP**（约 104 MB），**随仓库分发** |
-| `poses/thumbs/` | 画廊缩略图，**不入库**——缺失时由 `pose_db.ensure_thumb()` 用原图现生成 |
-| `poses/index.json` | 索引，**随仓库分发**；`img` 字段记实际落盘的扩展名 |
-| `poses/custom/` | 用户自己导入的姿态图，**不入版本库**；缩略图由插件生成在 `custom/thumbs/`，名称 / 分类 / 视角记在 `custom/meta.json` |
-| `data/zh-dict.csv` | 日→中对照表，重建索引时需要 |
-| `tools/` | `build_pose_db.py` 建索引、`optimize_library.py` 转 WebP；`tools/verify/*.mjs` 无头验证 |
+| `nodes.py` | 两个节点（`GuliPosePicker` / `GuliGarmentPicker`）共用 `_pick` 取图；三种取图模式、`IS_CHANGED` 缓存策略、`ui.picked` 回传 |
+| `pose_db.py` | 多库（`LIB_DIRS`）索引缓存、候选池与回退链、视角解析、缺图回退；所有公开函数带 `lib` 参数，无参即 `pose`，加库不破旧节点 |
+| `api_routes.py` | 按库前缀隔离的只读 / 上传 / 删除路由（`/guliposes/*`、`/guligarments/*`、`/gulifaces/*`），全部带路径穿越防护；导入时按库自注册 |
+| `web/` | 前端扩展，文件名 `gg-<功能>.js`：姿态 `gg-pose-gallery.js`、服装 `gg-garment-gallery.js`、脸模 `gg-face-gallery.js`（同构，按节点名 / 路由参数化） |
+| `poses/img/` | 姿态库内置原图，1439 张 900×1200 **WebP**（约 104 MB），**随仓库分发** |
+| `poses/thumbs/` | 姿态库画廊缩略图，**不入库**——缺失时由 `pose_db.ensure_thumb()` 用原图现生成 |
+| `poses/index.json` | 姿态库索引，**随仓库分发**；`img` 字段记实际落盘的扩展名 |
+| `garment/img/` | 服装库内置原图，1405 张约 1366×2048 **WebP**，**随仓库分发**（与 `poses/` 平级，在插件根目录下） |
+| `garment/thumbs/` | 服装库画廊缩略图，**不入库** |
+| `garment/index.json` | 服装库索引（单角度），**随仓库分发** |
+| `faces/img/` | 脸模库内置原图，默认 44 张 **WebP**，**随仓库分发**（与 `poses/` 平级，在插件根目录下） |
+| `faces/thumbs/` | 脸模库画廊缩略图，**不入库** |
+| `faces/index.json` | 脸模库索引（单角度），**随仓库分发** |
+| `faces/png/` | **用户放原始图（默认 PNG）的默认目录**，`auto_build` 自动转 `faces/img/*.webp` 并重建索引；原图**不入库**（只保留一份 README 说明） |
+| `user/default/guliposes/<lib>/custom/` | 用户各自导入的姿态 / 服装 / 脸模图（**在插件外面**，v1.2.2 起）；缩略图由插件生成在 `custom/thumbs/`，名称 / 分类 / 视角记在 `custom/meta.json` |
+| `data/zh-dict.csv` | 日→中对照表，重建姿态索引时需要 |
+| `tools/` | `build_pose_db.py`（姿态）、`build_garment_db.py`（服装）、`build_face_db.py`（脸模，含 PNG→WebP 转换）建索引、`optimize_library.py` 转 WebP；`retag_garment.py`（按类型重排服装分类）+ `garment_classify.py`（归类规则）；`userdata.py`（用户素材查看/迁移/备份）、`upgrade.py`（升级保护 + 全量替换）、`pack_release.py`（打发行包）；`tools/verify/*.mjs` 无头验证 |
 
 - 节点 ID `GuliPosePicker` 稳定且唯一，改动会断旧工作流。
 - 显示名用**中文**，统一 `GG ` 前缀（与 GuliNodes 的 `GG 图像宽高` 等一致）。
@@ -45,6 +54,31 @@
 - 文件名过 `safe_filename()`：去路径、去非法字符、补扩展名、躲 Windows 保留字、截 60 字符；删除走 `delete_custom()` 校验父目录，不接受任何相对路径。
 - **导入接口一次收齐所有分片再落盘**：要先知道总张数，才能给「统一名称」自动补 `1 / 2 / 3` 序号。响应里带 `nos`（与 `saved` 一一对应），前端拿它跳转——显示名是用户填的，还可能在重名时被加序号，**不能从文件名反推 `no`**。
 - **导入后要切到新图实际拥有的视角**：用户可能导入的是「侧面」，而画廊停在「正面」，不切就会显示「该角度缺图」。
+
+### 多库架构（pose / garment …）
+
+后端把「白模参考图库」抽象成一个可实例化的**库（lib）**：`pose`=姿态库、`garment`=服装库。后续加脸模库也走同一套，不要为每库重写一遍。
+
+- **中心配置 `pose_db.LIB_DIRS`**：各库的 `index` / `img` / `thumb` / `custom` / `custom_thumb` / `custom_meta` / `angles` 全写在这里。加库第一步就是往这里加一项。
+- **所有查询函数带 `lib: str = "pose"` 形参**：`index` / `pool` / `find_pose` / `series_options` / `category_options` / `angle_choices` / `resolve` / `ensure_thumb` / 自定义读写全部如此，**无参即姿态库**，老节点签名零回归。每个库独立缓存（按 `lib` 分桶），互不污染。
+- **加库三步走**：①在 `LIB_DIRS` 加一项（`index`/`img`/`thumb`/`custom` 指到该库根目录——姿态在 `poses/`、服装在 `garment/`、脸模在 `faces/`，后两者与 `poses/` 平级，都在插件根目录下）；②写 `tools/build_<lib>_db.py` 生成 `<lib>/index.json` 并把原图平铺进 `<lib>/img/`（分类信息全写索引，不靠子目录分堆）；③加一个 `GuliXxxPicker` 节点，`INPUT_TYPES` 调 `pose_db.*("<lib>")`、`pick` 调 `_pick("<lib>", ...)`。节点 ID 稳定且唯一，不要改已有的 `GuliPosePicker` / `GuliGarmentPicker` / `GuliFacePicker`。
+- **路由按前缀隔离**：`register_lib(lib, prefix)` 注册 `/<prefix>/*`，姿态=`guliposes`、服装=`guligarments`、脸模=`gulifaces`；`_serve()` 始终把目标路径限制在对应 `img` / `custom` 目录内（路径穿越防护不能省）。导入时 `register()` 按库逐个注册，脱离 ComfyUI（`PromptServer.instance` 为空）时直接跳过、不影响单独 import。
+- **前端画廊同构**：`web/gg-<lib>-gallery.js` 用 `NODE_NAME` / 路由前缀 / `__<prefix>Apply` 三处参数化；单角度库（服装、脸模）`angles` 退化为 `[{key:"front",label:"正面"}]`，`applyVisibility()` 与视角按钮栏按「不生效不展示」自动隐藏「视角」控件。单角度库的 `angle_choices()` 只返回 `["正面"]`（**不**追加「随机视角」），`pick_angle()` 把「正面」映射回 `front`。
+- **索引 schema 与姿态库一致**：`angles`、`series`(key/name/nameJp/short/count)、`poses`(no/series/code/cat/name/nameJp/angles/label)。服装额外带 `keywords`（英文关键词，供画廊搜索）与 `season`（原季节：春/夏/秋/冬/内衣/派对/泳装/性感）；脸模 `cat` 统一为 `脸模`；姿态没有 `keywords`。
+- **服装库的系列 = 穿搭类型，不是季节**：`dress`/`skirt`/`pants`/`top`/`innerwear`/`swimwear` 六类，`cat` 是二级细分（迷你 / 中长 / 百褶 / 牛仔 / 阔腿 / 连体 / 套装…），规则在 `tools/garment_classify.py`（只看主件；外套与配饰不参与一级判定；`LNG-` 前缀强制归内衣，因为里面的 `shorts` 是睡裤）。改规则后跑 `tools/retag_garment.py`（默认预演、`--apply` 落盘并备份），不要手改 1400 条 `cat`。`build_garment_db.py` 调同一模块，重建不会退回季节分法。
+- **关键词漏了主件的个例走 `OVERRIDES`，不要放宽规则**：这 14 套的源关键词只写了材质和配饰（`satin gloves heels`、`grey pleated loafers bag`），逐张看图确认后钉在 `garment_classify.py` 的 `OVERRIDES` 里（6 套缎面及地礼服 → 连衣裙·长款，8 套阔腿/直筒/连体裤 → 裤装）。**不要**为它们把 `pleated`、`satin` 加进裙装判定——`pleated` 多数场合指裤褶，放宽会把普通长裤吸进半身裙。
+- **`label` 格式是 `<cat> <code>`**（如 `半身裙·迷你 SPR-0001`），它是节点参数值，改格式等于让旧工作流的选中项失效；需要改时同步在条目里留 `labelOld`。`find_pose()` 还有第三层兜底：从任意 label 里抠编号（`SPR-0001`）按 `code` 回查，改名改过不止一轮时中间那版名字两头都对不上（`labelOld` 只留最早一版），靠编号仍能找回。
+- **原始图自动转换**：`pose_db.auto_build(lib)` 扫描 `<lib>/png/`（`RAW_SUBDIR`，默认放原始图的目录；也兼容库根目录与 `img/`），把非 WebP 原始图（默认 PNG）转成 WebP（`WEBP_QUALITY=95`、`WEBP_METHOD=4`、保持原尺寸），再以 `img/*.webp` 重建索引。`index(lib)` 每次先做两道检查：`_raw_pending()`（png/ 里有新图或更新的图）与 `_img_pending()`（img/ 里的 WebP 被增删），命中就重建，所以「丢图即用、删图即消失」，都不用跑脚本。`tools/build_face_db.py` 是手动入口（`--clean` 转换后删原始 PNG）；`pose_db.raw_dir(lib)` 返回该目录，供报错信息引用。
+- **`imgSig` 保护**：`auto_build` 在索引里写 `imgSig = [img/ 的 WebP 数, 最新 mtime_ns]`，`_img_pending()` 只对带该字段的索引生效。姿态库/服装库的手工索引没有这个字段 → 永不自动重建，人工整理的元数据不会被覆盖。新增库若也用 `auto_build`，这条自动生效。
+- **用户素材一律在插件外面，这条界线不能破**：内置素材（`img/`、`thumbs/`、`index.json`）随仓库分发，被升级覆盖是预期行为；用户自己放的东西（导入的图、原始图）必须在 `ComfyUI/user/default/guliposes/<lib>/{custom,png}/`。代码里访问这两个目录**只能**通过 `custom_dir(lib)` / `raw_dir(lib)`，不要拼 `NODE_DIR / "custom"`——插件升级有 `git pull`、删文件夹重新解压、管理器覆盖三条路，后两条会整目录替换。
+- **老位置迁移只复制、不删源**：`migrate_legacy_userdata()` 默认 `move=False`，且只搬图片与 `meta.json`（`README` 之类说明文件不搬，新位置有自己的一份，搬过去会把新版说明覆盖成旧的）。`ensure_userdata()` 在 `__init__.py` 里调一次，失败只打日志、不影响节点。
+- **`meta.json` 只能合并、不能覆盖**：新老位置的 meta 各有记录，直接 `copy2` 会把对方的显示名 / 分类 / 视角抹掉——图还在但全变成文件名 + 正面，等于用户自定义内容失效。走 `_merge_meta_file()`，并集里新位置优先。
+- **收件箱结算规则**：两个位置（插件内 `inbox/` 与 `USER_DATA_ROOT/inbox/`）都扫；只搬图片（`IMAGE_EXTS`）和 `.zip`，**非图片文件（readme、txt、psd）一个都不删**；搬完删源、清空壳目录，`inbox/` 根目录本身保留当入口。单张超过 `MAX_INBOX_FILE`、zip 超过 `MAX_ZIP_ENTRIES` 的一律跳过并打日志，别让一个几百 MB 的包把启动卡住。
+- **视角靠文件名后缀推断**（`_split_angle`）：`front/side/high/low/diag` 与中文「正面/侧面/俯视/仰视/斜侧」，分隔符 `_ - 空格 ·`。单角度库（服装 / 脸模）没有 side 这些角度，但**后缀照样要剥**，只是角度按正面——不剥会在显示名里留个没用的 `_side`。
+- **全量替换必须走 `tools/upgrade.py`，不许手写 rm/copy**：顺序是「快照 → 搬素材 → 结算收件箱 → 逐文件 sha256 校验 → 对齐目录」，校验有差异就拒绝删原件。替换时 `.git`、`.workbuddy*`、`inbox`、`dist` 四类永不参与删除——前两个是版本库与项目记忆，`inbox` 里是用户没结算的图包，`dist` 放发行包。改这段逻辑要同步跑 `full --dry-run` 看删除清单。
+- **发行包不许带用户数据**：`tools/pack_release.py` 的排除规则里，`poses|garment|faces/{custom,png}/` 下的图片、`meta.json`、`thumbs/` 一律剔除，`.workbuddy*` 与 `MANIFEST.txt`（打出来的产物）同样剔除，否则下次打包会把上次的清单吃回去。改规则后跑 `--list` 用 `grep` 确认零命中。
+- **缓存精度**：`_builtin` 的缓存键用 `st_mtime_ns`（秒级会在同一秒内重建后读到旧数据）；`_convert_to_webp` 同样按纳秒比较，同名覆盖源图能识别出来。
+- 验证多库时务必确认**跨库不串**：`pool(lib="pose")` 仍应只有姿态、`pool(lib="garment")` 只有服装、`pool(lib="face")` 只有脸模，自定义图按各自 `custom/` 落盘。
 
 ## 二、动手前：设计自检（强制）
 
@@ -113,6 +147,8 @@ GuliNodes 首选后端 `io.DynamicCombo`，本项目不适用：本节点含 **D
 - 包装 LiteGraph / ComfyUI 原型方法时：**保存原函数、幂等安装、失败回退**。
   原型标记用 `__gpPosePatched`，实例标记用 `__guliposesApply`——**两者不能同名**，
   否则实例读 `this._xInstalled` 会顺着原型链拿到 `true`，整段逻辑被静默跳过。
+  **多库各自用独立标记**：服装画廊用 `__gpGarmentPatched` / `__guligarmentsApply`，不要跨库复用姿态库的标记，
+  避免将来两个画廊守卫同一个原型时误判「已打过补丁」而整段跳过。
 - **优先包装原型，不要挂到画布实例的自有属性上**（`app.canvas.drawNode = ...` 会遮蔽原型，让其它扩展的补丁静默失效）。
 - 绘制期临时改控件值必须在 `finally` 里还原，且**还原用启动时记下的原值**，不要用「当前值」——嵌套绘制会把值弄脏。
 - **面板高度由用户决定，代码不许改节点高度**。`gallery.computeSize` 反算：
@@ -163,13 +199,14 @@ GuliNodes 首选后端 `io.DynamicCombo`，本项目不适用：本节点含 **D
 
 - `README.md` 与 `README_EN.md` **逐节对齐**，改一份必须同步另一份。
 - 用户可感知的改动写进 `README.md` 的「更新记录」；只写结果（行为、参数、错误信息、兼容性），不写实现过程。
-- 数字口径固定：**288 组姿态 / 1439 张图 / 4 系列 / 26 分类 / 5 视角**。
+- 数字口径固定：**288 组姿态 / 1439 张图 / 4 系列 / 26 分类 / 5 视角**（姿态库）；
+  **1405 套穿搭 / 1405 张图 / 6 类型（半身裙 440 / 连衣裙 391 / 裤装 293 / 内衣·家居 200 / 上装 58 / 泳装 23）/ 20 分类 / 1 视角（正面）**（服装库）。
   上游仓库简介写的「1439 组 / 2878 张」是把文件数当组数了，不要照抄。
 
 ## 九、验证
 
 - Python：`python -m py_compile nodes.py pose_db.py api_routes.py __init__.py`
-- JS：`node --check web/gg-pose-gallery.js`
+- JS：`node --check web/gg-pose-gallery.js && node --check web/gg-garment-gallery.js`
 - 独立导入（不启动 ComfyUI）：`importlib` 载入包 → 打印 `NODE_CLASS_MAPPINGS`、`INPUT_TYPES()` 键名、
   `IS_CHANGED` 两种返回值。确认没把 `__init__` 写成必须依赖 `PromptServer` 才能导入。
 - 起**隔离实例**再跑（不要动用户正在用的 8188）：
@@ -185,6 +222,7 @@ GuliNodes 首选后端 `io.DynamicCombo`，本项目不适用：本节点含 **D
   COMFY_PORT=8189 node tools/verify/layout.mjs            # 无溢出、栅格高度、推荐行可见
   COMFY_PORT=8189 node tools/verify/mode-visibility.mjs   # 各模式可见控件与节点高度
   COMFY_PORT=8189 node tools/verify/custom-import.mjs     # 导入闭环（点导入弹框 / 名称分类视角 / 同名合并 / 剪贴板 / 右键删除 / 清场复原）
+  COMFY_PORT=8189 node tools/verify/garment-types.mjs     # 服装库 6 类型 tab / 20 分类 / 三代旧名迁移（含编号兜底）
   ```
 
 - 改到工具行或面板布局时要重量：`layout.mjs` 之外再量 `.gp-tools` 的 `getBoundingClientRect().height`

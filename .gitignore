@@ -1,16 +1,41 @@
-# 内置图库：原图随仓库分发（1439 张 WebP，约 104 MB），clone 完就能用。
-# 缩略图不进仓库——它们能从原图算出来，节点在首次请求时现生成到 poses/thumbs/。
+# 内置图库：原图随仓库分发（WebP），clone 完就能用。
+# 缩略图不进仓库——它们能从原图算出来，节点在首次请求时现生成到 <lib>/thumbs/。
 poses/thumbs/
+garment/thumbs/
+faces/thumbs/
 
-# 用户在节点里导入的姿态图，属于本地数据，永远不入版本库
+# 用户在节点里导入的姿态 / 服装 / 脸模图，属于本地数据，永远不入版本库。
+# v1.2.2 起这类素材搬到 ComfyUI/user/default/guliposes/（插件外面），下面两条只
+# 兜住没迁移的老版本目录；userdata/ 是探测不到 ComfyUI 根时的最后退路。
 poses/custom/
+garment/custom/
+faces/custom/
+userdata/
+
+# 收件箱：用户把图包丢这里，启动时自动搬进用户数据区，不该进版本库。
+# 只留下那份说明，让 clone 下来的人一眼知道这个目录干什么用。
+inbox/*
+!inbox/说明_README.txt
+
+# 脸模原图默认丢进用户数据区的 png/，只作转换来源；仓库分发的是转换后的 img/*.webp
+faces/png/*.png
+faces/png/*.jpg
+faces/png/*.jpeg
+faces/png/*.bmp
+faces/*.png
+faces/*.jpg
+faces/*.jpeg
 
 # 离线安装包走 GitHub Release 附件，不进版本库
 *.7z
 *.zip
 
+# 截图脚本（tools/screenshot/）的依赖，用的时候自己 npm i
+node_modules/
+
 __pycache__/
 *.pyc
 
-# 本地工作记录，不入公开仓库
+# 本地工作记录与备份，不入公开仓库
+.workbuddy/
 .workbuddy-ai/

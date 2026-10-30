@@ -28,13 +28,23 @@ const CSS = `
   font:12px/1.35 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;
 }
 .gp-root *{box-sizing:border-box}
-.gp-stage{position:relative;flex:0 0 190px;display:flex;align-items:center;justify-content:center;
+/* 预览区高度不写死：由 layoutStage() 按节点剩余高度算出来，跟随节点高度放大。
+   flex:0 0 auto 让内联 height 生效，栅格仍用 flex:1 吃掉剩下空间。 */
+.gp-stage{position:relative;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
   background:#fff;border:1px solid var(--gp-line);border-radius:8px;overflow:hidden}
-.gp-stage img{max-width:100%;max-height:100%;object-fit:contain;display:block}
-.gp-stage[data-stale="1"] img{opacity:.4}
-.gp-stage .gp-empty{color:#8b93a1;font-size:12px}
-.gp-badge{position:absolute;left:6px;bottom:6px;padding:2px 7px;border-radius:5px;
+.gp-stage-img{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.gp-stage-img img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.gp-stage[data-stale="1"] .gp-stage-img{opacity:.4}
+.gp-stage .gp-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#8b93a1;font-size:12px}
+.gp-badge{position:absolute;left:6px;top:6px;z-index:2;padding:2px 7px;border-radius:5px;
   background:rgba(14,16,20,.72);color:#fff;font-size:11px;letter-spacing:.02em;pointer-events:none}
+/* 预览区底部的缩放滑块：拖节点变高时滑块还在，手动也能调预览占画廊的比例 */
+.gp-stage-ctrl{position:absolute;left:6px;right:6px;bottom:6px;z-index:2;display:flex;align-items:center;gap:6px;
+  background:rgba(14,16,20,.5);border-radius:6px;padding:3px 8px;backdrop-filter:blur(2px)}
+.gp-stage-ctrl[hidden]{display:none}
+.gp-stage-ctrl span{flex:0 0 auto;color:#fff;font-size:11px;opacity:.85;pointer-events:none}
+.gp-stage-range{flex:1 1 auto;min-width:0;height:14px;accent-color:var(--gp-ac);cursor:pointer}
+.gp-stage-range::-webkit-slider-thumb{accent-color:var(--gp-ac)}
 .gp-angles{display:flex;gap:4px}
 .gp-abtn{flex:1;height:26px;border-radius:6px;border:1px solid var(--gp-line);
   background:var(--gp-panel);color:var(--gp-fg);font-size:12px;cursor:pointer;padding:0;transition:.12s}
@@ -99,6 +109,7 @@ const CSS = `
 .gp-dlg-row input:focus,.gp-dlg-row select:focus{outline:1px solid var(--gp-ac);outline-offset:-1px}
 .gp-dlg-row input:disabled{opacity:.55}
 .gp-dlg-hint{min-height:15px;font-size:11px;line-height:1.35;color:var(--gp-fg);opacity:.55}
+.gp-dlg-bulk{font-size:11px;line-height:1.4;color:var(--gp-fg);opacity:.45}
 .gp-dlg-foot{display:flex;justify-content:flex-end;gap:6px}
 .gp-dlg-foot button{height:26px;padding:0 14px;border-radius:6px;border:1px solid var(--gp-line);
   background:var(--gp-panel);color:var(--gp-fg);font-size:12px;cursor:pointer}
@@ -159,7 +170,15 @@ function setup(node) {
 	const root = document.createElement("div");
 	root.className = "gp-root";
 	root.innerHTML = `
-		<div class="gp-stage"><span class="gp-empty">载入姿态库…</span></div>
+		<div class="gp-stage">
+			<div class="gp-stage-img"><span class="gp-empty">载入姿态库…</span></div>
+			<div class="gp-badge" hidden></div>
+			<div class="gp-stage-ctrl" hidden>
+				<span>预览</span>
+				<input class="gp-stage-range" type="range" min="15" max="85" step="1" value="55"
+					title="拖动调整预览图占节点高度的比例；拉高节点预览会跟着变大">
+			</div>
+		</div>
 		<div class="gp-angles"></div>
 		<div class="gp-tools">
 			<select class="gp-series" title="按系列筛选"></select>
@@ -194,6 +213,7 @@ function setup(node) {
 					<select class="gp-dlg-angle"></select></label>
 				<datalist id="gp-cat-list"></datalist>
 				<div class="gp-dlg-hint"></div>
+				<div class="gp-dlg-bulk">整包导入：把图片文件夹或 zip 丢进插件目录的 <b>inbox/pose/</b>，重启 ComfyUI 自动入库（多视角靠文件名后缀 front / side / high / low / diag）</div>
 				<div class="gp-dlg-foot">
 					<button class="gp-dlg-cancel" type="button">取消</button>
 					<button class="gp-dlg-ok" type="button">导入</button>
@@ -252,6 +272,47 @@ function setup(node) {
 		width ?? node.size[0],
 		Math.max(MIN_GALLERY_H, node.size[1] - chromeHeight()),
 	];
+
+	// ---------- 预览图尺寸：跟随节点高度 + 手动可调 ----------
+	// previewFrac = 预览区占「非栅格剩余空间」的比例。节点拉越高，剩余空间越大，
+	// 预览区就跟着越大（像其他图像节点那样）；滑块改 previewFrac 做手动微调。
+	const PREVIEW_MIN = 120;
+	let previewFrac = 0.55;
+	const stageRange = stage.querySelector(".gp-stage-range");
+
+	/** 算出预览区该多高：排除栅格与自身，其余兄弟（工具条/角度栏/页脚/推广）高度相加，
+	 *  再加 gap 与 padding，得到可用高度，再乘比例。不读栅格高度，避免反馈振荡。 */
+	function layoutStage() {
+		const avail = root.clientHeight;
+		if (avail <= 0) return; // 还没上屏，等 ResizeObserver 再来
+		let other = 0;
+		for (const child of root.children) {
+			if (child === stage || child === grid) continue;
+			other += child.offsetHeight;
+		}
+		const gap = 6 * (root.children.length - 1);
+		const pad = 12; // 6*2
+		const usable = Math.max(0, avail - other - gap - pad);
+		const h = Math.max(PREVIEW_MIN, Math.round(previewFrac * usable));
+		stage.style.height = `${h}px`;
+	}
+
+	if (stageRange) {
+		stageRange.value = Math.round(previewFrac * 100);
+		stageRange.oninput = () => {
+			previewFrac = Number(stageRange.value) / 100;
+			layoutStage();
+		};
+	}
+
+	// 节点被拖高/拖矮时 root 高度变化，重新分配预览高度。用 rAF 合并连续回调。
+	let stageRaf = 0;
+	if (typeof ResizeObserver !== "undefined") {
+		new ResizeObserver(() => {
+			cancelAnimationFrame(stageRaf);
+			stageRaf = requestAnimationFrame(layoutStage);
+		}).observe(root);
+	}
 
 	const st = {
 		db: null,
@@ -394,17 +455,28 @@ function setup(node) {
 
 	function renderStage() {
 		const pose = st.sel;
-		if (!pose) return;
-		const name = fileFor(pose, st.angle, "img");
-		stage.innerHTML = name
-			? `<img src="${fileURL(pose, "img", name)}" draggable="false" alt=""><div class="gp-badge"></div>`
-			: `<span class="gp-empty">该角度缺图</span>`;
-		stage.dataset.stale = st.stale ? "1" : "0";
+		const imgBox = stage.querySelector(".gp-stage-img");
 		const badge = stage.querySelector(".gp-badge");
-		if (badge) {
+		const ctrl = stage.querySelector(".gp-stage-ctrl");
+		if (!pose) {
+			imgBox.innerHTML = `<span class="gp-empty">载入姿态库…</span>`;
+			badge.hidden = true;
+			ctrl.hidden = true;
+			return;
+		}
+		const name = fileFor(pose, st.angle, "img");
+		if (name) {
+			imgBox.innerHTML = `<img src="${fileURL(pose, "img", name)}" draggable="false" alt="">`;
+			badge.hidden = false;
+			ctrl.hidden = false;
 			const prefix = st.stale ? "上次 · " : "";
 			badge.textContent = `${prefix}${pose.code} · ${pose.cat} · ${st.db.angleLabels[st.angle]}`;
+		} else {
+			imgBox.innerHTML = `<span class="gp-empty">该角度缺图</span>`;
+			badge.hidden = true;
+			ctrl.hidden = true;
 		}
+		stage.dataset.stale = st.stale ? "1" : "0";
 	}
 
 	function renderAngles() {
@@ -522,6 +594,7 @@ function setup(node) {
 		layoutGridCols(list.length);
 		renderFoot(list.length);
 		markSelection();
+		layoutStage(); // 预览高度依赖节点剩余空间，每次重绘后重算
 
 		// 随机模式下预览的可能是上一次的结果，不在候选范围里就压暗提示
 		const stale = isRandom() && st.sel ? !scopedPool().includes(st.sel) : false;

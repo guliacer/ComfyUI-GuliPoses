@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ComfyUI-GuliPoses · 节点预览</title>
+<style>
+  :root{
+    --bg:#f6f7f9; --fg:#1f2329; --dim:#5b6470; --line:#e3e6ec;
+    --card:#ffffff; --ac:#4f8cff; --shadow:0 8px 28px rgba(20,30,50,.10);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+    font:15px/1.5 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;}
+  .wrap{max-width:980px;margin:0 auto;padding:24px 16px 48px}
+  h1{font-size:20px;margin:0 0 4px}
+  .sub{color:var(--dim);font-size:13px;margin:0 0 18px}
+  .carousel{position:relative;background:var(--card);border:1px solid var(--line);
+    border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+  .viewport{overflow:hidden}
+  .track{display:flex;transition:transform .38s cubic-bezier(.22,.61,.36,1);will-change:transform;touch-action:pan-y}
+  .slide{flex:0 0 100%;margin:0;display:flex;flex-direction:column;align-items:center}
+  .slide .imgbox{width:100%;background:#fff;display:flex;align-items:center;justify-content:center}
+  .slide img{display:block;max-width:100%;max-height:min(70vh,640px);width:auto;height:auto;object-fit:contain}
+  .slide figcaption{padding:10px 16px 14px;color:var(--dim);font-size:13px;text-align:center}
+  .slide figcaption b{color:var(--fg);font-weight:600}
+  .nav{position:absolute;top:calc(50% - 22px);transform:translateY(-50%);
+    width:44px;height:44px;border-radius:50%;border:1px solid var(--line);
+    background:rgba(255,255,255,.92);color:#333;font-size:22px;line-height:1;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow);
+    transition:background .15s,color .15s,transform .15s}
+  .nav:hover{background:var(--ac);color:#fff;border-color:var(--ac)}
+  .nav:active{transform:translateY(-50%) scale(.94)}
+  .nav.prev{left:12px}
+  .nav.next{right:12px}
+  .bar{display:flex;align-items:center;justify-content:center;gap:14px;padding:12px 0 16px;
+    background:var(--card);border-top:1px solid var(--line)}
+  .dots{display:flex;gap:8px}
+  .dot{width:9px;height:9px;border-radius:50%;background:#c9ced6;border:0;padding:0;cursor:pointer;transition:.18s}
+  .dot.on{background:var(--ac);width:26px;border-radius:5px}
+  .count{color:var(--dim);font-size:13px;min-width:52px;text-align:center}
+  .hint{text-align:center;color:var(--dim);font-size:12px;margin-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ComfyUI-GuliPoses · 节点预览</h1>
+  <p class="sub">GG 姿态库 / GG 服装库 / GG 脸模库 —— 左右滑动或点箭头切换</p>
+
+  <div class="carousel" id="carousel">
+    <div class="viewport" id="viewport">
+      <div class="track" id="track">
+        <figure class="slide">
+          <div class="imgbox"><img src="screenshots/node-pose.png" alt="GG 姿态库"></div>
+          <figcaption><b>GG 姿态库</b> · 288 组姿态 × 5 视角，画廊翻选即出图</figcaption>
+        </figure>
+        <figure class="slide">
+          <div class="imgbox"><img src="screenshots/node-garment.png" alt="GG 服装库"></div>
+          <figcaption><b>GG 服装库</b> · 1405 套穿搭 × 单角度，按穿搭类型筛选</figcaption>
+        </figure>
+        <figure class="slide">
+          <div class="imgbox"><img src="screenshots/node-face.jpg" alt="GG 脸模库"></div>
+          <figcaption><b>GG 脸模库</b> · 44 张脸模，可自行扩充</figcaption>
+        </figure>
+      </div>
+    </div>
+    <button class="nav prev" id="prev" aria-label="上一张">‹</button>
+    <button class="nav next" id="next" aria-label="下一张">›</button>
+    <div class="bar">
+      <div class="dots" id="dots"></div>
+      <div class="count" id="count"></div>
+    </div>
+  </div>
+
+  <p class="hint">← → 方向键 / 触摸拖动 / 鼠标拖拽，均可切换</p>
+</div>
+
+<script>
+(function () {
+  const track = document.getElementById("track");
+  const slides = Array.from(track.children);
+  const dots = document.getElementById("dots");
+  const count = document.getElementById("count");
+  const viewport = document.getElementById("viewport");
+  const n = slides.length;
+  let i = 0;
+
+  slides.forEach((_, k) => {
+    const b = document.createElement("button");
+    b.className = "dot" + (k === 0 ? " on" : "");
+    b.addEventListener("click", () => go(k));
+    dots.appendChild(b);
+  });
+
+  function go(x) {
+    i = (x + n) % n;
+    track.style.transform = "translateX(" + (-i * 100) + "%)";
+    Array.from(dots.children).forEach((d, k) => d.classList.toggle("on", k === i));
+    count.textContent = (i + 1) + " / " + n;
+  }
+
+  document.getElementById("prev").addEventListener("click", () => go(i - 1));
+  document.getElementById("next").addEventListener("click", () => go(i + 1));
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft") go(i - 1);
+    if (e.key === "ArrowRight") go(i + 1);
+  });
+
+  // 触摸 / 鼠标拖拽
+  let startX = 0, dx = 0, dragging = false;
+  const down = (x) => { startX = x; dx = 0; dragging = true; track.style.transition = "none"; };
+  const move = (x) => {
+    if (!dragging) return;
+    dx = x - startX;
+    track.style.transform = "translateX(calc(" + (-i * 100) + "% + " + dx + "px))";
+  };
+  const up = () => {
+    if (!dragging) return;
+    dragging = false;
+    track.style.transition = "";
+    if (Math.abs(dx) > 50) go(dx < 0 ? i + 1 : i - 1); else go(i);
+  };
+
+  viewport.addEventListener("touchstart", (e) => down(e.touches[0].clientX), { passive: true });
+  viewport.addEventListener("touchmove", (e) => move(e.touches[0].clientX), { passive: true });
+  viewport.addEventListener("touchend", up);
+  viewport.addEventListener("mousedown", (e) => { e.preventDefault(); down(e.clientX); });
+  window.addEventListener("mousemove", (e) => move(e.clientX));
+  window.addEventListener("mouseup", up);
+
+  go(0);
+})();
+</script>
+</body>
+</html>
