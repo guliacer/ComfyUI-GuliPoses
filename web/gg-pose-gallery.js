@@ -7,6 +7,8 @@ const NODE_NAME = "GuliPosePicker";
 // 固定选中 696 = 586 画廊 + 110 外框，其中 110 = 38（标题栏+内边距）+ 3 行 × 24。
 const GALLERY_HEIGHT = 586; // 默认画廊高度（440 宽 / 固定选中时的量值）
 const MIN_GALLERY_H = 240; // 再拉矮也不会比这个更小
+const MAX_GALLERY_H = 1300; // 兜底上限：任何前端下画廊都不会被算成几千像素
+const MAX_NODE_H = 1600; // 打开旧工作流时，超过这个高度视为被撑爆的异常尺寸
 const NODE_CHROME_H = 38; // 标题栏 + 节点内边距
 const PARAM_ROW_H = 24; // 一个参数行：widget 20 + 间距 4
 
@@ -267,11 +269,63 @@ function setup(node) {
 	}
 
 	// 画廊吃掉节点剩下的高度：拉高节点 → 画廊跟着变高 → 栅格多显示几行。
-	// node.computeSize() 求和时又回到 node.size[1]，自洽，不会递归。
-	gallery.computeSize = (width) => [
-		width ?? node.size[0],
-		Math.max(MIN_GALLERY_H, node.size[1] - chromeHeight()),
-	];
+	//
+	// ⚠ 这里曾经无条件写 `gallery.computeSize = () => [w, node.size[1] - chrome]`，
+	// 在 Nodes 2.0（1.5.x 的 Vue 节点渲染）下会让节点无限长高，必须条件化：
+	//   · litegraph 的 _arrangeWidgets 里，**带 computeSize 的 widget 走「定高」分支**，
+	//     computedHeight = computeSize()[1]；
+	//   · 1.5.x 把尺寸权威交给了 DOM —— 节点 DOM 高度取 min-height(layoutStore 的 size)
+	//     与内容高度的较大者，ResizeObserver 再把量到的内容高回报成 contentSize，
+	//     renderingSize = max(size, contentSize)；
+	//   · 定高的画廊按 renderingSize 反算，内容又比 size 高出几个像素（+4 / +8 / +6 这些
+	//     常量），于是每帧涨一点，几十帧就顶到上限 —— 用户看到的就是一条几千像素的白条。
+	// 新前端的 _arrangeWidgets 会用 distributeSpace 把节点剩余高度分给**没有 computeSize**
+	// 的 DOM widget，所以默认不挂 computeSize；只有确认这个前端不分配（老版本）时才降级挂上。
+	let legacyComputeSize = false;
+	function installLegacyComputeSize() {
+		if (legacyComputeSize) return;
+		legacyComputeSize = true;
+		gallery.computeSize = (width) => {
+			const w = width ?? node.size?.[0] ?? 440;
+			const chrome = chromeHeight();
+			const raw = (node.size?.[1] ?? GALLERY_HEIGHT + chrome) - chrome;
+			return [w, Math.min(MAX_GALLERY_H, Math.max(MIN_GALLERY_H, raw))];
+		};
+		node.graph?.setDirtyCanvas(true, true);
+	}
+
+	/** 老前端不给 DOM widget 分配剩余高度，画廊会被压成默认行高（20px 上下）。
+	 *  节点明明够高、画廊却几乎没有高度 → 说明没被分配，降级挂 computeSize。
+	 *  必须在 DOM 真正上屏之后才判，否则首帧 clientHeight=0 会误伤新前端。 */
+	function checkGalleryAllocated() {
+		if (legacyComputeSize) return;
+		const nodeH = node.size?.[1] ?? 0;
+		if (nodeH < MIN_GALLERY_H + chromeHeight() + 40) return; // 节点本来就不高，无从判断
+		const got = root.clientHeight || 0;
+		if (got >= MIN_GALLERY_H * 0.6) return; // 拿到空间了
+		installLegacyComputeSize();
+	}
+
+	/** 旧工作流里可能存着被上面那个 bug 撑爆的高度，打开时压回可用范围。 */
+	function clampHeight() {
+		const h = node.size?.[1] ?? 0;
+		if (h <= MAX_NODE_H) return;
+		node.setSize([node.size?.[0] ?? 440, MAX_NODE_H]);
+	}
+	// onConfigure 里要用（那时 setup 已经跑过，但作用域在闭包里）
+	node.__gpPoseKeepSaneHeight = () => {
+		clampHeight();
+		checkGalleryAllocated();
+	};
+
+	// 上屏后连探几轮：老前端到点就降级，新前端探到画廊有高度就停。
+	let probes = 0;
+	(function probe() {
+		probes += 1;
+		clampHeight();
+		checkGalleryAllocated();
+		if (!legacyComputeSize && probes < 12) setTimeout(probe, 400);
+	})();
 
 	// ---------- 预览图尺寸：跟随节点高度 + 手动可调 ----------
 	// previewFrac = 预览区占「非栅格剩余空间」的比例。节点拉越高，剩余空间越大，
@@ -407,7 +461,7 @@ function setup(node) {
 		showWidget(catWidget, showFilters);
 
 		// 参数行变了，但**不动节点高度**——用户拉过多大就是多大，不能因为切模式被吸回去。
-		// 少掉的那几行自然由画廊吃掉（gallery.computeSize 按 node.size[1] 反算）。
+		// 少掉的那几行由画廊吃掉：新前端按剩余空间分配，老前端由 computeSize 反算。
 		node.graph?.setDirtyCanvas(true, true);
 	}
 
@@ -1141,6 +1195,14 @@ app.registerExtension({
 				trimOutputs(this);
 			} catch (err) {
 				console.warn("[GG 姿态库] 清理多余输出槽失败：", err);
+			}
+			// 被 Nodes 2.0 bug 撑爆的工作流会把那个高度一起存进去，恢复后立刻收一遍；
+			// DOM 渲染完还会再量一次尺寸，所以下一帧再兜一次底。
+			try {
+				this.__gpPoseKeepSaneHeight?.();
+				requestAnimationFrame(() => this.__gpPoseKeepSaneHeight?.());
+			} catch (err) {
+				console.warn("[GG 姿态库] 高度自检失败：", err);
 			}
 			return r;
 		};
