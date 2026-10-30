@@ -106,11 +106,19 @@ cd ComfyUI/custom_nodes
 git clone --depth 1 https://github.com/guliacer/ComfyUI-GuliPoses.git
 ```
 
-No git? Download the [Release archive](https://github.com/guliacer/ComfyUI-GuliPoses/releases) and extract the `ComfyUI-GuliPoses` folder into `ComfyUI/custom_nodes/`.
+No git? Download the [Release archive](https://github.com/guliacer/ComfyUI-GuliPoses/releases/latest) (`ComfyUI-GuliPoses-v1.2.3.zip`, ~263 MB) and extract the `ComfyUI-GuliPoses` folder into `ComfyUI/custom_nodes/`.
+
+Already running an older version with your own images inside the plugin folder? **Do not delete the folder and reinstall.** Upgrade from the archive with:
+
+```bash
+python tools/upgrade.py full --from ComfyUI-GuliPoses-v1.2.3.zip --purge
+```
+
+It moves your images into the user data folder first, snapshots them, then replaces the tree.
 
 Restart ComfyUI, then right-click the canvas → **Add Node** → **GuliPoses** → **GG 姿态库**.
 
-> The repository ships every image (~105 MB), so a clone is all you need. Later `git pull`s only fetch code changes.
+> The repository ships every image (~270 MB across pose / garment / face), so a clone is all you need. Later `git pull`s only fetch code changes.
 
 ---
 

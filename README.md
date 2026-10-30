@@ -106,11 +106,17 @@ cd ComfyUI/custom_nodes
 git clone --depth 1 https://github.com/guliacer/ComfyUI-GuliPoses.git
 ```
 
-没有 git 就下载 [Release 离线包](https://github.com/guliacer/ComfyUI-GuliPoses/releases)，解压后把 `ComfyUI-GuliPoses` 目录放进 `ComfyUI/custom_nodes/`。
+没有 git 就下载 [Release 离线包](https://github.com/guliacer/ComfyUI-GuliPoses/releases/latest)（`ComfyUI-GuliPoses-v1.2.3.zip`，约 263 MB），解压后把 `ComfyUI-GuliPoses` 目录放进 `ComfyUI/custom_nodes/`。
+
+已经有旧版、且插件目录里放了自己的图：**别直接删目录覆盖**，用离线包升级时这样跑，会先把素材搬到用户目录再替换：
+
+```bash
+python tools/upgrade.py full --from ComfyUI-GuliPoses-v1.2.3.zip --purge
+```
 
 重启 ComfyUI，画布空白处右键 → 新建节点 → **GuliPoses** → **GG 姿态库**。
 
-> 仓库自带全部图片（约 105 MB），clone 完就能用，不用另外准备数据。之后 `git pull` 只拉代码改动。
+> 仓库自带全部图片（姿态 / 服装 / 脸模共约 270 MB），clone 完就能用，不用另外准备数据。之后 `git pull` 只拉代码改动。
 
 ---
 
