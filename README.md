@@ -1,73 +1,12 @@
 # ComfyUI-GuliPoses
 
-<!-- 节点效果预览：左右滑动查看（第一张默认最大，点箭头 / 拖动切换） -->
-<div class="gp-showcase">
-  <div class="gp-showcase-view">
-    <div class="gp-showcase-track">
-      <figure class="gp-showcase-slide">
-        <img src="docs/screenshots/node-pose.png" alt="GG 姿态库" width="760">
-        <figcaption>GG 姿态库 · 288 组姿态 × 5 视角</figcaption>
-      </figure>
-      <figure class="gp-showcase-slide">
-        <img src="docs/screenshots/node-garment.png" alt="GG 服装库" width="760">
-        <figcaption>GG 服装库 · 1405 套穿搭</figcaption>
-      </figure>
-      <figure class="gp-showcase-slide">
-        <img src="docs/screenshots/node-face.jpg" alt="GG 脸模库" width="760">
-        <figcaption>GG 脸模库 · 44 张脸模</figcaption>
-      </figure>
-    </div>
-  </div>
-  <div class="gp-showcase-nav">
-    <button type="button" class="gp-showcase-prev" aria-label="上一张">‹</button>
-    <span class="gp-showcase-dots"></span>
-    <button type="button" class="gp-showcase-next" aria-label="下一张">›</button>
-  </div>
-</div>
-<style>
-.gp-showcase{max-width:780px;margin:0 auto 18px}
-.gp-showcase-view{overflow:hidden;border:1px solid #e3e6ec;border-radius:12px;background:#fff}
-.gp-showcase-track{display:flex;transition:transform .35s ease;touch-action:pan-y}
-.gp-showcase-slide{flex:0 0 100%;margin:0;display:flex;flex-direction:column;align-items:center}
-.gp-showcase-slide img{display:block;max-width:100%;max-height:560px;width:auto;height:auto;margin:0 auto}
-.gp-showcase-slide figcaption{padding:6px 12px 10px;font-size:12px;color:#5b6470}
-.gp-showcase-nav{display:flex;align-items:center;justify-content:center;gap:12px;padding:8px 0}
-.gp-showcase-nav button{width:30px;height:30px;border-radius:50%;border:1px solid #d6dae1;background:#fff;color:#333;font-size:17px;line-height:1;cursor:pointer}
-.gp-showcase-nav button:hover{border-color:#4f8cff;color:#4f8cff}
-.gp-showcase-dots{display:flex;gap:6px}
-.gp-showcase-dot{width:8px;height:8px;border-radius:50%;background:#c9ced6;border:0;padding:0;cursor:pointer}
-.gp-showcase-dot.on{background:#4f8cff;width:20px;border-radius:4px}
-</style>
-<script>
-(function(){
-  document.querySelectorAll('.gp-showcase').forEach(function(root){
-    var track=root.querySelector('.gp-showcase-track');
-    if(!track) return;
-    var n=track.children.length,i=0;
-    var dots=root.querySelector('.gp-showcase-dots');
-    var prev=root.querySelector('.gp-showcase-prev');
-    var next=root.querySelector('.gp-showcase-next');
-    var view=root.querySelector('.gp-showcase-view');
-    for(var k=0;k<n;k++){(function(k){
-      var b=document.createElement('button');b.type='button';b.className='gp-showcase-dot';
-      b.setAttribute('aria-label','第'+(k+1)+'张');
-      b.addEventListener('click',function(){go(k);});
-      dots.appendChild(b);
-    })(k);}
-    function go(x){i=(x+n)%n;track.style.transform='translateX('+(-i*100)+'%)';
-      for(var k=0;k<dots.children.length;k++){dots.children[k].className='gp-showcase-dot'+(k===i?' on':'');}}
-    prev.addEventListener('click',function(){go(i-1);});
-    next.addEventListener('click',function(){go(i+1);});
-    var sx=0,dx=0,down=false;
-    view.addEventListener('touchstart',function(e){sx=e.touches[0].clientX;dx=0;down=true;},{passive:true});
-    view.addEventListener('touchmove',function(e){if(down)dx=e.touches[0].clientX-sx;},{passive:true});
-    view.addEventListener('touchend',function(){if(down&&Math.abs(dx)>40)go(dx<0?i+1:i-1);down=false;});
-    go(0);
-  });
-})();
-</script>
+<p align="center">
+  <a href="docs/showcase.html"><img src="docs/screenshots/node-pose.png" alt="GG 姿态库" width="248"></a>
+  <a href="docs/showcase.html"><img src="docs/screenshots/node-garment.png" alt="GG 服装库" width="248"></a>
+  <a href="docs/showcase.html"><img src="docs/screenshots/node-face.jpg" alt="GG 脸模库" width="248"></a>
+</p>
 
-<p align="center"><sub>左右滑动 / 点箭头切换 · <a href="docs/showcase.html">全屏滑动预览 ↗</a></sub></p>
+<p align="center"><sub>GG 姿态库 288 组 × 5 视角 ｜ GG 服装库 1405 套 ｜ GG 脸模库 44 张 —— <a href="docs/showcase.html">点图看全屏预览 ↗</a></sub></p>
 
 [![ComfyUI](https://img.shields.io/badge/ComfyUI-custom__nodes-4f8cff)](https://github.com/comfyanonymous/ComfyUI)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776ab)](https://www.python.org/)
